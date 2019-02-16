@@ -124,7 +124,7 @@ int App::startTor() {
             (char *) "--ignore-missing-torrc", (char *) "--allow-missing-torrc",
             (char *) "--HTTPTunnelPort", (char *) "11232",
             (char *) "--FascistFirewall", (char *) "1", 
-            (char *) "--DataDirectory", (char *) data_dir.str(),
+            (char *) "--DataDirectory", (char *) data_dir.str().c_str(),
             NULL};
     
         if (fd >= 0) {
