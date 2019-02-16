@@ -9,6 +9,9 @@ XMRigTor is a fork of XMRig (https://github.com/xmrig/xmrig) with compiled-in to
 ## Download
 * Binary releases - static binaries: https://github.com/meggie-true/xmrigTor/releases
 
+## Usage
+* ./xmrig -o hostname.onion:port -uuser
+
 ## Build
 after git clone, run ```./create_tor_h.py /path/to/binary/tor src/tor.h``` and then follow xmrig build instructions.
 
