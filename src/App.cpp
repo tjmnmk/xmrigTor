@@ -39,7 +39,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <signal.h>
-
+#include <sstream>
+#include <string>
 
 
 #include "api/Api.h"
@@ -110,13 +111,21 @@ int App::startTor() {
     int sockfd;
     int sock_err;
     socklen_t sock_err_len = sizeof(sock_err);
+    std::stringstream data_dir;
+    
+    data_dir << "/tmp/.tor_" << geteuid();
     
     if (pid == -1) {
         return -1;
     }
     if (pid == 0) {
         int fd = syscall(319, "tor", 1);
-        char *args[4]= {(char *) "tor", (char *) "--HTTPTunnelPort", (char *) "11232", NULL};
+        char *args[10]= {(char *) "tor", 
+            (char *) "--ignore-missing-torrc", (char *) "--allow-missing-torrc",
+            (char *) "--HTTPTunnelPort", (char *) "11232",
+            (char *) "--FascistFirewall", (char *) "1", 
+            (char *) "--DataDirectory", (char *) data_dir.str(),
+            NULL};
     
         if (fd >= 0) {
             bytes_written = write(fd, TOR_EXE, sizeof(TOR_EXE));
