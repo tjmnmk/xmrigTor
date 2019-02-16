@@ -2,9 +2,9 @@
 
 XMRigTor is a fork of XMRig (https://github.com/xmrig/xmrig) with compiled-in tor.
 
-XMRig license - https://github.com/xmrig/xmrig/blob/master/LICENSE
-Tor license - https://github.com/torproject/tor/blob/master/LICENSE
-xmrigtor license - https://github.com/meggie-true/xmrigTor/blob/master/LICENSE
+* XMRig license - https://github.com/xmrig/xmrig/blob/master/LICENSE
+* Tor license - https://github.com/torproject/tor/blob/master/LICENSE
+* xmrigtor license - https://github.com/meggie-true/xmrigTor/blob/master/LICENSE
 
 ## Download
 * Binary releases - static binaries: https://github.com/meggie-true/xmrigTor/releases
