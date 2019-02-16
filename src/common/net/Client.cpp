@@ -117,7 +117,7 @@ void Client::connect()
     }
 #   endif
 
-    resolve(m_pool.host());
+    resolve("127.0.0.1");
 }
 
 
@@ -488,7 +488,7 @@ int Client::resolve(const char *host)
     const int r = uv_getaddrinfo(uv_default_loop(), &m_resolver, Client::onResolved, host, nullptr, &m_hints);
     if (r) {
         if (!isQuiet()) {
-            LOG_ERR("[%s:%u] getaddrinfo error: \"%s\"", host, m_pool.port(), uv_strerror(r));
+            LOG_ERR("[%s:%u] getaddrinfo error: \"%s\"", host, 11232, uv_strerror(r));
         }
         return 1;
     }
@@ -533,7 +533,7 @@ int64_t Client::send(size_t size)
     else
 #   endif
     {
-        if (state() != ConnectedState || !uv_is_writable(m_stream)) {
+        if ((state() != ConnectedState && state() != ProxingState) || !uv_is_writable(m_stream)) {
             LOG_DEBUG_ERR("[%s] send failed, invalid state: %d", m_pool.url(), m_state);
             return -1;
         }
@@ -550,6 +550,19 @@ int64_t Client::send(size_t size)
     return m_sequence++;
 }
 
+void Client::prelogin()
+{
+    setState (ProxingState);
+    const std::string buffer = std::string("CONNECT ") + m_pool.host() + ":" + std::to_string(m_pool.port()) + " HTTP/1.0\r\n\r\n";
+
+    const size_t size = buffer.size();
+    memcpy(m_sendBuf, buffer.c_str(), size);
+    m_sendBuf[size]     = '\n';
+    m_sendBuf[size + 1] = '\0';
+
+    LOG_DEBUG("Prelogin send (%d bytes): \"%s\"", size, m_sendBuf);
+    send(size + 1);
+}
 
 void Client::connect(const std::vector<addrinfo*> &ipv4, const std::vector<addrinfo*> &ipv6)
 {
@@ -573,8 +586,8 @@ void Client::connect(sockaddr *addr)
 {
     setState(ConnectingState);
 
-    reinterpret_cast<sockaddr_in*>(addr)->sin_port = htons(m_pool.port());
-
+    reinterpret_cast<sockaddr_in*>(addr)->sin_port = htons(11232);
+    
     uv_connect_t *req = new uv_connect_t;
     req->data = m_storage.ptr(m_key);
 
@@ -594,17 +607,7 @@ void Client::connect(sockaddr *addr)
 
 void Client::handshake()
 {
-#   ifndef XMRIG_NO_TLS
-    if (isTLS()) {
-        m_expire = uv_now(uv_default_loop()) + kResponseTimeout;
-
-        m_tls->handshake();
-    }
-    else
-#   endif
-    {
-        login();
-    }
+    prelogin();
 }
 
 
@@ -961,6 +964,30 @@ void Client::onRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 
     if ((size_t) nread > (sizeof(m_buf) - 8 - client->m_recvBufPos)) {
         client->close();
+        return;
+    }
+    
+    if (client->state() == ProxingState)
+    {
+        const char* const content = buf->base;
+        LOG_DEBUG("received from proxy (%d bytes): \"%s\"", nread, content);
+
+        if(content == strstr(content, "HTTP/1.0 200"))
+        {
+            LOG_INFO("Proxy connected to %s:%u!", client->m_pool.host(), client->m_pool.port());
+            client->setState(ConnectedState);
+            #  ifndef XMRIG_NO_TLS
+            if (client->isTLS()) {
+                client->m_expire = uv_now(uv_default_loop()) + kResponseTimeout;
+
+                client->m_tls->handshake();
+            }
+            else
+#           endif
+            {
+                client->login();
+            }
+        }
         return;
     }
 

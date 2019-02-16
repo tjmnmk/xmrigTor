@@ -53,6 +53,7 @@ public:
         UnconnectedState,
         HostLookupState,
         ConnectingState,
+        ProxingState,
         ConnectedState,
         ClosingState
     };
@@ -112,6 +113,7 @@ private:
     void connect(const std::vector<addrinfo*> &ipv4, const std::vector<addrinfo*> &ipv6);
     void connect(sockaddr *addr);
     void handshake();
+    void prelogin();
     void login();
     void onClose();
     void parse(char *line, size_t len);

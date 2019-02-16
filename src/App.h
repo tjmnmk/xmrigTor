@@ -57,6 +57,7 @@ private:
   void background();
   void close();
   void release();
+  int startTor();
 
   static void onSignal(uv_signal_t *handle, int signum);
 
@@ -67,6 +68,7 @@ private:
   uv_signal_t m_sigHUP;
   uv_signal_t m_sigINT;
   uv_signal_t m_sigTERM;
+  int torPid;
   xmrig::Controller *m_controller;
 };
 
