@@ -255,11 +255,11 @@ void App::onConsoleCommand(char command)
 
 void App::close()
 {
-    kill(torPid, SIGTERM);
     m_controller->network()->stop();
     Workers::stop();
 
     uv_stop(uv_default_loop());
+    kill(torPid, SIGTERM);
 }
 
 
